@@ -28,7 +28,7 @@ async function measureRealVitals() {
 
   try {
     statusEl.innerText = "Measuring...";
-    const res = await fetch("https://physiology.presagetech.com/api/v1/measure", {
+    const res = await fetch("api/measure", {
       method: "POST",
       headers: {
         "x-api-key": PRESAGE_API_KEY,
