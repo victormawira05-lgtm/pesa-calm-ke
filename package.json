@@ -1,0 +1,8 @@
+{
+  "name": "pesa-calm-ke",
+  "version": "1.0.0",
+  "description": "PesaCalm KE - Presage SmartSpectra for M-Pesa stress guard",
+  "main": "main.js",
+  "scripts": { "start": "electron ." },
+  "license": "MIT"
+}
