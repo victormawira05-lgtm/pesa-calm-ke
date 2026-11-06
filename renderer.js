@@ -6,7 +6,7 @@ const statusEl = document.getElementById('status');
 const consent = document.getElementById('consent');
 
 // PASTE YOUR KEY HERE - from dashboard Network -> Preview tab
-const PRESAGE_API_KEY = "PASTE_KEY_HERE";
+const PRESAGE_API_KEY = "FgiCgWX9pf20H6714udIx4spEGXbBgNq66Z4YV7H";
 
 navigator.mediaDevices.getUserMedia({video:true}).then(s=>{
   video.srcObject=s;
