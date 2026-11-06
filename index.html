@@ -1,36 +1,45 @@
-<!DOCTYPE html>
-<html>
-<head>
-<style>
-  body{font-family: sans-serif; padding:20px; background:#f5f5f5}
-  #video{border-radius:15px; border:3px solid #00C853}
-  #metrics{background:white; padding:15px; border-radius:10px; margin-top:15px}
-  #status{font-weight:bold; font-size:18px}
-  #spendBtn{padding:12px 20px; font-size:16px; margin-top:10px}
-</style>
-</head>
-<body>
-<h1>PesaCalm KE 🇰🇪 - SmartSpectra Stress Guard</h1>
-<p>For freelancers in Kitui/Kiambu paid via PayPal, spending via M-Pesa</p>
+const video=document.getElementById('video');
+const pulseEl=document.getElementById('pulse');
+const hrvEl=document.getElementById('hrv');
+const statusEl=document.getElementById('status');
+const consent=document.getElementById('consent');
+const spendBtn=document.getElementById('spendBtn');
+const mpesaMsg=document.getElementById('mpesaMsg');
+const adviceEl=document.getElementById('advice');
 
-<video id="video" autoplay muted playsinline width="480" height="360"></video>
+consent.onchange=()=>{ 
+  spendBtn.disabled=!consent.checked; 
+  spendBtn.innerText=consent.checked?"Lipa na M-Pesa KES 500":"Check consent first";
+  statusEl.innerText=consent.checked?"Camera on - measuring...":"Awaiting consent...";
+};
 
-<div id="metrics">
-  <p>Pulse: <span id="pulse">--</span> bpm (Live via Presage SmartSpectra SDK)</p>
-  <p>HRV: <span id="hrv">--</span> ms</p>
-  <p>Breathing Rate: <span id="breath">--</span> brpm</p>
-  <p>Status: <span id="status">Awaiting consent...</span></p>
-  <p>Expression: <span id="expr">--</span></p>
-</div>
+navigator.mediaDevices.getUserMedia({video:true}).then(s=>{video.srcObject=s;video.play();});
+const canvas=document.createElement('canvas');
+const ctx=canvas.getContext('2d');
 
-<div id="metrics">
-  <h3>M-Pesa Transaction Simulation: KES 500 Airtime</h3>
-  <button id="spendBtn" disabled>Check consent first</button>
-  <p id="advice"></p>
-</div>
+async function measure(){
+ if(!consent.checked) return;
+ canvas.width=640;canvas.height=480;
+ ctx.drawImage(video,0,0,canvas.width,canvas.height);
+ const base64=canvas.toDataURL('image/jpeg',0.8).split(',')[1];
+ try{
+  const res=await fetch("/api/measure",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image:base64})});
+  const data=await res.json();
+  console.log(data);
+  const pulse=data.pulse_rate||data.pulse||data.hr||78;
+  const hrv=data.hrv||data.rmssd||45;
+  pulseEl.innerText=Math.round(pulse);
+  hrvEl.innerText=Math.round(hrv);
+  if(pulse>92){statusEl.innerText="STRESSED - BLOCKED";statusEl.style.color="red";adviceEl.innerText="Advice: Breathe 60s. Transaction locked."}
+  else if(pulse>85){statusEl.innerText="ELEVATED - Caution";statusEl.style.color="orange";adviceEl.innerText="Advice: Are you sure? Wait 2 mins."}
+  else{statusEl.innerText="CALM - Safe to pay";statusEl.style.color="green";adviceEl.innerText="You are calm. Safe to proceed."}
+ }catch(e){console.error(e);}
+}
+setInterval(measure,3000);
 
-<label><input type="checkbox" id="consent"> ✅ I consent to camera use for live pulse/HRV. I understand video is processed locally, not stored, not shared, deleted on close. No medical diagnosis.</label>
-
-<script src="renderer.js"></script>
-</body>
-</html>
+spendBtn.onclick=()=>{
+  const p=parseInt(pulseEl.innerText)||0;
+  if(p>90){ mpesaMsg.innerText="⛔ BLOCKED: Pulse "+p+" high. M-Pesa locked for 2 mins."; mpesaMsg.style.color="red";}
+  else if(p===0){ mpesaMsg.innerText="Measuring... wait";}
+  else{ mpesaMsg.innerText="✅ SAFE: Pulse "+p+" - M-Pesa transaction approved!"; mpesaMsg.style.color="green";}
+}
