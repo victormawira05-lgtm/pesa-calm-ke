@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body{font-family: sans-serif; padding:20px; background:#f5f5f5}
+  #video{border-radius:15px; border:3px solid #00C853}
+  #metrics{background:white; padding:15px; border-radius:10px; margin-top:15px}
+  #status{font-weight:bold; font-size:18px}
+  #spendBtn{padding:12px 20px; font-size:16px; margin-top:10px}
+</style>
+</head>
+<body>
+<h1>PesaCalm KE 🇰🇪 - SmartSpectra Stress Guard</h1>
+<p>For freelancers in Kitui/Kiambu paid via PayPal, spending via M-Pesa</p>
+
+<video id="video" autoplay muted playsinline width="480" height="360"></video>
+
+<div id="metrics">
+  <p>Pulse: <span id="pulse">--</span> bpm (Live via Presage SmartSpectra SDK)</p>
+  <p>HRV: <span id="hrv">--</span> ms</p>
+  <p>Breathing Rate: <span id="breath">--</span> brpm</p>
+  <p>Status: <span id="status">Awaiting consent...</span></p>
+  <p>Expression: <span id="expr">--</span></p>
+</div>
+
+<div id="metrics">
+  <h3>M-Pesa Transaction Simulation: KES 500 Airtime</h3>
+  <button id="spendBtn" disabled>Check consent first</button>
+  <p id="advice"></p>
+</div>
+
+<label><input type="checkbox" id="consent"> ✅ I consent to camera use for live pulse/HRV. I understand video is processed locally, not stored, not shared, deleted on close. No medical diagnosis.</label>
+
+<script src="renderer.js"></script>
+</body>
+</html>
