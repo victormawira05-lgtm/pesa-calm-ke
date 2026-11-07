@@ -1,66 +1,214 @@
-// PesaCalm KE - REAL Presage Physiology API
-const video = document.getElementById('video');
-const pulseEl = document.getElementById('pulse');
-const hrvEl = document.getElementById('hrv');
-const statusEl = document.getElementById('status');
-const consent = document.getElementById('consent');
+import { SmartSpectraSDK } from '@smartspectra/node-sdk/renderer';
+import { breathingMetrics, cardioMetrics } from '@smartspectra/node-sdk';
+import { decodeMetrics } from '@smartspectra/node-sdk/messages';
 
-// PASTE YOUR KEY HERE - from dashboard Network -> Preview tab
-const PRESAGE_API_KEY = "FgiCgWX9pf20H6714udIx4spEGXbBgNq66Z4YV7H";
+const $ = (id) => document.getElementById(id);
+const startButton = $('startButton');
+const stopButton = $('stopButton');
+const consent = $('consent');
+const statusText = $('statusText');
+const pulseValue = $('pulseValue');
+const breathingValue = $('breathingValue');
+const hrvValue = $('hrvValue');
+const video = $('cameraPreview');
+const promptCard = $('pausePrompt');
+const breathCard = $('breathExercise');
+const breathCircle = $('breathCircle');
+const breathLabel = $('breathLabel');
+const breathTimer = $('breathTimer');
+const demoButton = $('demoPaymentButton');
+const demoMessage = $('demoMessage');
 
-navigator.mediaDevices.getUserMedia({video:true}).then(s=>{
-  video.srcObject=s;
-  video.onloadedmetadata = ()=> video.play();
-});
+let sdk;
+let latestPulse = null;
+let pulseHistory = [];
+let elevatedSamples = 0;
+let lastPromptAt = 0;
+let breathingInterval;
+let breathSeconds = 30;
+let stream = null;
 
-const canvas = document.createElement('canvas');
-const ctx = canvas.getContext('2d');
+function setStatus(message, mode = 'neutral') {
+  statusText.textContent = message;
+  statusText.dataset.mode = mode;
+}
 
-async function measureRealVitals() {
-  if(!consent.checked || !PRESAGE_API_KEY || PRESAGE_API_KEY.includes("PASTE")) {
-    statusEl.innerText = consent.checked ? "Add API key in code" : "Please consent to measure";
+function latestValue(series) {
+  const item = Array.isArray(series) ? series.at(-1) : undefined;
+  return typeof item?.value === 'number' ? item.value : null;
+}
+
+function showMetrics(payload) {
+  let metrics;
+  try {
+    metrics = payload?.cardio || payload?.breathing ? payload : decodeMetrics(payload);
+  } catch (error) {
+    console.warn('Could not decode SmartSpectra metrics:', error);
     return;
   }
-  
-  canvas.width = 640; canvas.height = 480;
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
-  try {
-    statusEl.innerText = "Measuring...";
-    const res = await fetch("api/measure", {
-      method: "POST",
-      headers: {
-        "x-api-key": PRESAGE_API_KEY,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ image: base64 })
-    });
-    
-    const data = await res.json();
-    console.log("Presage:", data);
-    
-    // Real values from API
-    const pulse = data.pulse_rate || data.pulse || 0;
-    const breathing = data.respiratory_rate || data.breathing || 0;
-    const stress = data.stress || data.hrv_score || 0;
+  const pulse = latestValue(metrics?.cardio?.pulseRate);
+  const breathing = latestValue(metrics?.breathing?.rate);
+  const hrv = metrics?.cardio?.hrv?.at(-1)?.rmssd;
 
-    pulseEl.innerText = Math.round(pulse);
-    hrvEl.innerText = Math.round(stress) || Math.round(breathing);
+  if (pulse !== null && pulse > 0) {
+    latestPulse = pulse;
+    pulseValue.textContent = String(Math.round(pulse));
+    pulseHistory.push(pulse);
+    pulseHistory = pulseHistory.slice(-20);
+    assessPulse(pulse);
+  }
+  if (breathing !== null) breathingValue.textContent = breathing.toFixed(1);
+  if (typeof hrv === 'number') hrvValue.textContent = hrv.toFixed(1);
+}
 
-    if(pulse > 90 || stress > 70){
-      statusEl.innerText = `STRESSED (${pulse}bpm) - M-Pesa KES 500 BLOCKED`;
-      statusEl.style.color = "red";
-      // BLOCK M-Pesa logic here
-    } else {
-      statusEl.innerText = `CALM (${pulse}bpm) - Safe to transact`;
-      statusEl.style.color = "green";
-    }
-  } catch(e){
-    console.error(e);
-    statusEl.innerText = "Error: Check API key / CORS - Using fallback";
+function assessPulse(pulse) {
+  if (pulseHistory.length < 5) {
+    setStatus('Finding your recent pulse baseline…', 'neutral');
+    return;
+  }
+
+  const baselineSamples = pulseHistory.slice(0, Math.min(8, pulseHistory.length));
+  const baseline = baselineSamples.reduce((sum, value) => sum + value, 0) / baselineSamples.length;
+  const isElevated = pulse >= Math.max(90, baseline + 12);
+  elevatedSamples = isElevated ? elevatedSamples + 1 : 0;
+
+  if (elevatedSamples >= 3 && Date.now() - lastPromptAt > 60_000) {
+    promptCard.hidden = false;
+    lastPromptAt = Date.now();
+    setStatus('Your pulse is above your recent baseline.', 'attention');
+  } else if (!isElevated) {
+    promptCard.hidden = true;
+    setStatus('Pulse reading received. Take care of yourself.', 'good');
   }
 }
 
-// Measure every 3 seconds to save credits (100 credits = 50 mins at this rate)
-setInterval(measureRealVitals, 3000);
+async function startMeasurement() {
+  if (!consent.checked) {
+    setStatus('Please review and accept camera consent first.', 'attention');
+    return;
+  }
+  startButton.disabled = true;
+  setStatus('Connecting to SmartSpectra…');
+
+  try {
+    const apiKey = await window.pesaCalm.getPresageApiKey();
+    if (!apiKey) {
+      setStatus('Missing Presage key. Add PRESAGE_API_KEY to your local .env file, then restart.', 'attention');
+      startButton.disabled = false;
+      return;
+    }
+
+    sdk = new SmartSpectraSDK({
+      apiKey,
+      requestedMetrics: [...breathingMetrics, ...cardioMetrics],
+    });
+    sdk.on('streamAvailable', (mediaStream) => {
+      if (mediaStream instanceof MediaStream) {
+        stream = mediaStream;
+        video.srcObject = mediaStream;
+        video.play().catch(() => {});
+      }
+    });
+    sdk.on('metrics', showMetrics);
+    sdk.on('validationStatus', (validation) => {
+      const message = typeof validation === 'string' ? validation : validation?.message;
+      if (message) setStatus(message, 'neutral');
+    });
+    sdk.on('error', (error) => {
+      console.error('SmartSpectra error:', error);
+      setStatus(error?.message || 'SmartSpectra could not start. Check your key and connection.', 'attention');
+      startButton.disabled = false;
+    });
+
+    await sdk.start();
+    stopButton.disabled = false;
+    setStatus('Measurement started. Keep your face in view and hold still.', 'good');
+  } catch (error) {
+    console.error('Could not start measurement:', error);
+    setStatus(error?.message || 'Could not start measurement. Check camera permissions and API key.', 'attention');
+    startButton.disabled = false;
+    stopButton.disabled = true;
+  }
+}
+
+async function stopMeasurement() {
+  if (sdk) {
+    try { await sdk.stop(); } catch (error) { console.warn('Stop warning:', error); }
+    try { sdk.destroy(); } catch (error) { console.warn('Cleanup warning:', error); }
+    sdk = undefined;
+  }
+  if (stream) {
+    stream.getTracks().forEach((track) => track.stop());
+    stream = null;
+  }
+  video.srcObject = null;
+  pulseHistory = [];
+  latestPulse = null;
+  elevatedSamples = 0;
+  pulseValue.textContent = '—';
+  breathingValue.textContent = '—';
+  hrvValue.textContent = '—';
+  promptCard.hidden = true;
+  startButton.disabled = false;
+  stopButton.disabled = true;
+  setStatus(consent.checked ? 'Measurement stopped.' : 'Camera consent withdrawn. Camera is off.');
+}
+
+function startBreathing() {
+  promptCard.hidden = true;
+  breathCard.hidden = false;
+  breathSeconds = 30;
+  breathTimer.textContent = String(breathSeconds);
+  let phaseSeconds = 0;
+  let inhale = true;
+  breathLabel.textContent = 'Breathe in';
+  breathCircle.classList.add('inhale');
+  clearInterval(breathingInterval);
+
+  breathingInterval = setInterval(() => {
+    breathSeconds -= 1;
+    phaseSeconds += 1;
+    breathTimer.textContent = String(Math.max(0, breathSeconds));
+    if (phaseSeconds >= (inhale ? 4 : 6)) {
+      inhale = !inhale;
+      phaseSeconds = 0;
+      breathLabel.textContent = inhale ? 'Breathe in' : 'Breathe out';
+      breathCircle.classList.toggle('inhale', inhale);
+    }
+    if (breathSeconds <= 0) {
+      clearInterval(breathingInterval);
+      breathCard.hidden = true;
+      setStatus('Exercise complete. Notice how you feel before deciding what to do next.', 'good');
+    }
+  }, 1000);
+}
+
+consent.addEventListener('change', () => {
+  if (!consent.checked) stopMeasurement();
+  startButton.disabled = !consent.checked;
+});
+startButton.addEventListener('click', startMeasurement);
+stopButton.addEventListener('click', stopMeasurement);
+$('breathingButton').addEventListener('click', startBreathing);
+$('dismissPrompt').addEventListener('click', () => { promptCard.hidden = true; });
+$('stopBreathing').addEventListener('click', () => {
+  clearInterval(breathingInterval);
+  breathCard.hidden = true;
+});
+demoButton.addEventListener('click', () => {
+  const pulseText = latestPulse === null ? 'No current pulse reading is available.' : `Current reading: ${Math.round(latestPulse)} bpm.`;
+  demoMessage.textContent = `${pulseText} Demo only: no M-Pesa payment or transaction is connected.`;
+});
+
+window.addEventListener('beforeunload', () => {
+  clearInterval(breathingInterval);
+  if (sdk) {
+    sdk.stop();
+    sdk.destroy();
+  }
+  stream?.getTracks().forEach((track) => track.stop());
+});
+
+startButton.disabled = true;
+setStatus('Accept camera consent to start a measurement.');

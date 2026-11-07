@@ -1,45 +1,59 @@
-const video=document.getElementById('video');
-const pulseEl=document.getElementById('pulse');
-const hrvEl=document.getElementById('hrv');
-const statusEl=document.getElementById('status');
-const consent=document.getElementById('consent');
-const spendBtn=document.getElementById('spendBtn');
-const mpesaMsg=document.getElementById('mpesaMsg');
-const adviceEl=document.getElementById('advice');
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080d18">
+    <title>PesaCalm KE — pause and check in</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="#top" aria-label="PesaCalm home"><span class="brand-mark">P</span><span>PesaCalm <b>KE</b></span></a>
+        <span class="local-label"><i></i> PRIVATE WELLNESS DEMO</span>
+      </header>
 
-consent.onchange=()=>{ 
-  spendBtn.disabled=!consent.checked; 
-  spendBtn.innerText=consent.checked?"Lipa na M-Pesa KES 500":"Check consent first";
-  statusEl.innerText=consent.checked?"Camera on - measuring...":"Awaiting consent...";
-};
+      <section class="intro" id="top">
+        <p class="eyebrow">A MOMENT FOR YOU</p>
+        <h1>Pause. Breathe.<br><span>Then decide.</span></h1>
+        <p class="lede">A gentle check-in that uses camera-based pulse measurements to help you notice how you’re feeling.</p>
+      </section>
 
-navigator.mediaDevices.getUserMedia({video:true}).then(s=>{video.srcObject=s;video.play();});
-const canvas=document.createElement('canvas');
-const ctx=canvas.getContext('2d');
+      <section class="dashboard" aria-label="Pulse measurement">
+        <div class="camera-panel">
+          <video id="cameraPreview" autoplay muted playsinline aria-label="Camera preview"></video>
+          <div class="camera-placeholder" aria-hidden="true"><div class="face-outline"><span></span></div><p>Your camera preview appears here</p></div>
+          <div class="camera-caption"><span class="live-dot"></span> CAMERA PREVIEW</div>
+        </div>
 
-async function measure(){
- if(!consent.checked) return;
- canvas.width=640;canvas.height=480;
- ctx.drawImage(video,0,0,canvas.width,canvas.height);
- const base64=canvas.toDataURL('image/jpeg',0.8).split(',')[1];
- try{
-  const res=await fetch("/api/measure",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image:base64})});
-  const data=await res.json();
-  console.log(data);
-  const pulse=data.pulse_rate||data.pulse||data.hr||78;
-  const hrv=data.hrv||data.rmssd||45;
-  pulseEl.innerText=Math.round(pulse);
-  hrvEl.innerText=Math.round(hrv);
-  if(pulse>92){statusEl.innerText="STRESSED - BLOCKED";statusEl.style.color="red";adviceEl.innerText="Advice: Breathe 60s. Transaction locked."}
-  else if(pulse>85){statusEl.innerText="ELEVATED - Caution";statusEl.style.color="orange";adviceEl.innerText="Advice: Are you sure? Wait 2 mins."}
-  else{statusEl.innerText="CALM - Safe to pay";statusEl.style.color="green";adviceEl.innerText="You are calm. Safe to proceed."}
- }catch(e){console.error(e);}
-}
-setInterval(measure,3000);
+        <div class="readings-panel">
+          <div class="section-heading"><div><p class="eyebrow">YOUR CHECK-IN</p><h2>Live readings</h2></div><span class="pulse-icon">♡</span></div>
+          <div class="primary-reading"><span class="reading-label">PULSE</span><div><strong id="pulseValue">—</strong><span class="unit">bpm</span></div><div class="pulse-line" aria-hidden="true"><span></span></div></div>
+          <div class="secondary-readings">
+            <div><span class="reading-label">BREATHING RATE</span><p><strong id="breathingValue">—</strong> <span class="unit">/min</span></p></div>
+            <div><span class="reading-label">HRV · RMSSD</span><p><strong id="hrvValue">—</strong> <span class="unit">ms</span></p></div>
+          </div>
+          <div class="status-box" id="statusText" data-mode="neutral" role="status" aria-live="polite">Accept camera consent to start a measurement.</div>
+          <div class="consent-row"><input id="consent" type="checkbox"><label for="consent">I agree to let SmartSpectra use my camera for this check-in. I can stop at any time.</label></div>
+          <div class="actions"><button id="startButton" class="button button-primary" disabled>Start check-in</button><button id="stopButton" class="button button-secondary" disabled>Stop</button></div>
+        </div>
+      </section>
 
-spendBtn.onclick=()=>{
-  const p=parseInt(pulseEl.innerText)||0;
-  if(p>90){ mpesaMsg.innerText="⛔ BLOCKED: Pulse "+p+" high. M-Pesa locked for 2 mins."; mpesaMsg.style.color="red";}
-  else if(p===0){ mpesaMsg.innerText="Measuring... wait";}
-  else{ mpesaMsg.innerText="✅ SAFE: Pulse "+p+" - M-Pesa transaction approved!"; mpesaMsg.style.color="green";}
-}
+      <section class="pause-card" id="pausePrompt" hidden aria-live="polite">
+        <div class="pause-symbol">✦</div><div class="pause-copy"><p class="eyebrow">A GENTLE NUDGE</p><h2>Your pulse is above your recent baseline.</h2><p>If it feels right, take 30 seconds to breathe. <em>Pumzika, pesa itakuja.</em></p></div>
+        <div class="pause-actions"><button id="breathingButton" class="button button-primary">Start breathing</button><button id="dismissPrompt" class="text-button">Maybe later</button></div>
+      </section>
+
+      <section class="breath-card" id="breathExercise" hidden aria-live="polite">
+        <div class="breath-orb" id="breathCircle"><span id="breathLabel">Breathe in</span></div>
+        <div class="breath-copy"><p class="eyebrow">30-SECOND RESET</p><h2>Take this moment slowly.</h2><p>Follow the circle: breathe in for four seconds, out for six.</p><div class="timer"><strong id="breathTimer">30</strong><span>seconds left</span></div><button class="text-button" id="stopBreathing">End exercise</button></div>
+      </section>
+
+      <section class="spending-card"><div class="spending-icon">↗</div><div><p class="eyebrow">BEFORE A SPENDING DECISION</p><h2>Give yourself a little space.</h2><p>This demo can’t connect to or control M-Pesa. Any payment decision stays yours.</p><p class="demo-message" id="demoMessage" aria-live="polite"></p></div><button id="demoPaymentButton" class="button button-outline">Simulate a pause</button></section>
+
+      <footer><span>PesaCalm KE · A personal wellness demo</span><span>Not a medical device or financial advice</span></footer>
+    </main>
+    <script src="dist/renderer.bundle.js"></script>
+  </body>
+</html>

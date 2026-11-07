@@ -1,8 +1,21 @@
 {
   "name": "pesa-calm-ke",
-  "version": "1.0.0",
-  "description": "PesaCalm KE - Presage SmartSpectra for M-Pesa stress guard",
+  "version": "1.1.0",
+  "description": "A consent-first financial wellness demo using Presage SmartSpectra camera-based pulse metrics.",
   "main": "main.js",
-  "scripts": { "start": "electron ." },
+  "scripts": {
+    "build": "esbuild renderer.js --bundle --platform=browser --format=iife --outfile=dist/renderer.bundle.js",
+    "start": "npm run build && electron ."
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@smartspectra/node-sdk": "latest"
+  },
+  "devDependencies": {
+    "electron": "43.2.0",
+    "esbuild": "^0.25.0"
+  },
   "license": "MIT"
 }
