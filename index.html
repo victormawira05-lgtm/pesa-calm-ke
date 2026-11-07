@@ -36,6 +36,7 @@
           </div>
           <div class="status-box" id="statusText" data-mode="neutral" role="status" aria-live="polite">Accept camera consent to start a measurement.</div>
           <div class="consent-row"><input id="consent" type="checkbox"><label for="consent">I agree to let SmartSpectra use my camera for this check-in. I can stop at any time.</label></div>
+          <details class="data-note"><summary>Camera and data handling</summary><p>Video is analyzed by the local SmartSpectra runtime and is not saved by this app. Pulse readings stay in memory only and are cleared when you stop or close the app. SDK aggregate telemetry is disabled. Presage authentication still needs an internet connection. No AI service or M-Pesa connection is used.</p></details>
           <div class="actions"><button id="startButton" class="button button-primary" disabled>Start check-in</button><button id="stopButton" class="button button-secondary" disabled>Stop</button></div>
         </div>
       </section>

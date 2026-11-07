@@ -102,6 +102,9 @@ async function startMeasurement() {
     sdk = new SmartSpectraSDK({
       apiKey,
       requestedMetrics: [...breathingMetrics, ...cardioMetrics],
+      // The SDK's aggregate diagnostics are optional and default to enabled.
+      // This app opts out to minimize data sent beyond authentication traffic.
+      enableTelemetry: false,
     });
     sdk.on('streamAvailable', (mediaStream) => {
       if (mediaStream instanceof MediaStream) {
@@ -111,13 +114,12 @@ async function startMeasurement() {
       }
     });
     sdk.on('metrics', showMetrics);
-    sdk.on('validationStatus', (validation) => {
-      const message = typeof validation === 'string' ? validation : validation?.message;
-      if (message) setStatus(message, 'neutral');
+    sdk.on('validationStatus', (_code, _timestampUs, hint) => {
+      if (hint) setStatus(hint, 'neutral');
     });
-    sdk.on('error', (error) => {
-      console.error('SmartSpectra error:', error);
-      setStatus(error?.message || 'SmartSpectra could not start. Check your key and connection.', 'attention');
+    sdk.on('error', (code, message, retryable) => {
+      console.error('SmartSpectra error:', code, message, 'retryable:', retryable);
+      setStatus(message || 'SmartSpectra could not start. Check your key and connection.', 'attention');
       startButton.disabled = false;
     });
 
