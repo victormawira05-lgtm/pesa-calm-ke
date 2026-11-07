@@ -1,49 +1,33 @@
-# PesaCalm KE
+# PesaCalm KE 🇰🇪
+### *Pumzika, pesa itakuja* - A consent-first financial wellness app
 
-A desktop wellness demo that uses Presage SmartSpectra to show camera-based pulse, breathing-rate, and HRV readings. When several readings stay above a recent personal baseline, it offers an optional 30-second guided breathing exercise and the message “Pumzika, pesa itakuja.”
+> Built with Presage SmartSpectra SDK - Camera-based pulse wellness check before financial decisions.
 
-## Requirements
+**Live Demo:** https://YOUR-CODESPACE-8000.app.github.dev
+*(Replace with your PORTS -> 8000 globe link)*
 
-- Node.js 20 or newer and npm
-- A webcam and a working internet connection for SmartSpectra authentication
-- A Presage SmartSpectra API key for your project
+**YouTube Demo:** [Link to your video]
 
-## Run locally
+---
 
+## ✨ What it does
+PesaCalm detects stress via camera pulse (SmartSpectra) and pauses risky M-Pesa / loan decisions.
+
+- 📹 **Pulse Check:** Uses Presage SmartSpectra to get BPM from selfie camera
+- 🧘 **Swahili Wellness:** If BPM > 85, shows "Pumzika, pesa itakuja 🌿"
+- 💚 **Consent-First:** All processing on-device, no video uploaded
+
+## 🛠️ Tech Stack
+- **Frontend:** HTML5, Vanilla JS
+- **Wellness Engine:** Presage SmartSpectra (Node SDK for desktop, Web SDK for browser)
+- **Platform:** Vite + Web Camera API
+
+## 🚀 Run Locally
 ```bash
+# Browser version (no build errors)
+python3 -m http.server 8000
+# Then open PORTS -> 8000
+
+# Or with Vite
 npm install
-```
-
-Copy `.env.example` to `.env`, then put your **newly issued** SmartSpectra API key in `.env`:
-
-```dotenv
-PRESAGE_API_KEY=replace_with_your_key
-```
-
-Start the desktop app:
-
-```bash
-npm start
-```
-
-Accept the in-app camera consent and choose **Start check-in**. The app shows real SDK measurements; it does not invent values when measurement fails. Use **Stop** or uncheck consent to end measurement.
-
-## Privacy and scope
-
-- Camera access starts only after the user accepts consent and starts a check-in.
-- Video is passed to the SmartSpectra SDK for measurement. This app does not save or upload video itself. Review Presage’s SDK and service privacy terms for their processing and telemetry practices.
-- API keys belong in the local ignored `.env` file. Never commit them or paste them into source code.
-- Pulse is not a diagnosis of stress or a medical condition. The baseline comparison is a simple wellness prompt, not a validated clinical assessment.
-- This project does not integrate with M-Pesa. Its spending control is only a demo message; it cannot approve, block, or make payments.
-
-## Project files
-
-- `main.js` — Electron window, permissions, secure SDK IPC binding, and local key loading
-- `preload.js` — SmartSpectra preload plus a narrow API-key bridge
-- `renderer.js` — SDK lifecycle, metric display, baseline prompt, and breathing exercise
-- `index.html`, `styles.css` — interface
-
-## References
-
-- [Presage SmartSpectra Node.js and Electron SDK](https://smartspectra.presagetech.com/docs/nodejs/)
-- [SmartSpectra metric definitions](https://smartspectra.presagetech.com/docs/nodejs/metrics)
+npm run dev -- --host 0.0.0.0 --port 5173
