@@ -3,8 +3,7 @@
 
 > Built with Presage SmartSpectra SDK - Camera-based pulse wellness check before financial decisions.
 
-**Live Demo:** https://YOUR-CODESPACE-8000.app.github.dev
-*(Replace with your PORTS -> 8000 globe link)*
+**Live Demo:** https://bookish-zebra-7vq9gxggwqq4fxvw9-5173.app.github.dev/
 
 **YouTube Demo:** [Link to your video]
 
